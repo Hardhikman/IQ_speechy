@@ -8,26 +8,36 @@ A multi-engine text-to-speech (TTS) system with voice cloning, fast preset voice
 - Clone any voice with 3-6 seconds of reference audio
 - Preset speakers: Dave, Jo
 - Custom voice upload support
+- **Auto-chunking** for long-form text (200 chars per chunk)
 
 ### ⚡ Supertonic (Fast TTS)
 - **167x faster** than real-time
 - 4 preset voices: M1, M2 (male), F1, F2 (female)
-- Adjustable speed (0.9x - 1.5x)
+- Adjustable speed (0.9x - 1.5x) and quality steps
 - Long-form text with auto-chunking
 - CPU optimized (no GPU required)
 
-### 🎙️ Podcast Generator
-- Create multi-speaker conversations
-- Up to 4 different voices
-- Script format with speaker tags: `[M1]`, `[M2]`, `[F1]`, `[F2]`
-- Adjustable pause between speakers
-- Auto-combines into single podcast audio
+### 🎙️ Podcast Generators
+
+**Supertonic Podcast** - Fast multi-speaker:
+```
+[M1] Welcome to our podcast!
+[F1] Thanks for having me.
+[M2] Great to be here.
+[F2] Let's dive in!
+```
+
+**NeuTTS Podcast** - Voice cloned speakers:
+```
+[Dave] Welcome to the show!
+[Jo] Thanks for having me.
+```
 
 ## Getting Started
 
 ### 1. Clone the repository
 ```bash
-git clone <repo-url>
+git clone https://github.com/Hardhikman/IQ_speechy.git
 cd neutts-tts-project
 ```
 
@@ -38,8 +48,9 @@ neutts-env\Scripts\activate  # Windows
 pip install -r requirements.txt
 ```
 
-### 3. Download Supertonic assets
+### 3. Clone Supertonic repo and assets
 ```bash
+git clone https://github.com/supertone-inc/supertonic.git supertonic
 git lfs install
 git clone https://huggingface.co/Supertone/supertonic assets
 ```
@@ -55,30 +66,22 @@ Open http://localhost:7860 in your browser.
 
 ```
 neutts-tts-project/
-├── app.py              # Main Gradio application
+├── app.py              # Main Gradio application (4 tabs)
+├── requirements.txt    # Python dependencies
 ├── assets/             # Supertonic ONNX models & voice styles
 ├── neutts-air/         # NeuTTS Air library
 ├── supertonic/py/      # Supertonic Python inference code
 └── output/             # Generated audio files
 ```
 
-## Usage
-
-The web interface has three tabs:
+## Tabs
 
 | Tab | Engine | Best For |
 |-----|--------|----------|
 | **NeuTTS Air** | Voice cloning | Custom voice replication |
-| **Supertonic** | Preset voices | Fast, long-form TTS |
-| **Podcast Generator** | Multi-speaker | Conversations, podcasts |
-
-### Podcast Script Example
-```
-[M1] Welcome to our podcast! Today we're discussing AI.
-[F1] Thanks for having me. It's an exciting topic.
-[M1] What are your thoughts on voice synthesis?
-[F1] It's getting incredibly realistic these days!
-```
+| **Supertonic** | Preset voices | Fast single-voice TTS |
+| **🎙️ Podcast Generator** | Supertonic | Fast 4-voice podcasts |
+| **🎙️ NeuTTS Podcast** | NeuTTS | Voice-cloned 2-speaker podcasts |
 
 ## Dependencies
 
