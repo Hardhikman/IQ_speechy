@@ -1,0 +1,15 @@
+# Core dependencies
+gradio>=4.0.0
+numpy
+soundfile
+torch
+transformers
+
+# Supertonic TTS
+onnxruntime
+scipy
+
+# NeuTTS Air
+librosa
+phonemizer
+llama-cpp-python

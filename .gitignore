@@ -223,3 +223,11 @@ temp_output.wav
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Supertonic TTS (cloned repo - large ONNX models)
+assets/
+supertonic/
+
+# Cloned repo git folders
+assets/.git/
+supertonic/.git/
