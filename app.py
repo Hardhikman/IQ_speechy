@@ -31,24 +31,36 @@ def initialize_neutts():
         )
     return tts
 
-def load_reference_speaker(speaker_name):
-    """Load pre-defined speakers (Dave or Jo)"""
-    speaker_files = {
-        "Dave": {
-            "audio": os.path.join(neutts_air_path, "samples", "dave.wav"),
-            "text": os.path.join(neutts_air_path, "samples", "dave.txt")
-        },
-        "Jo": {
-            "audio": os.path.join(neutts_air_path, "samples", "jo.wav"),
-            "text": os.path.join(neutts_air_path, "samples", "jo.txt")
-        }
-    }
+def get_available_speakers():
+    """Scan samples directory and return list of available speakers."""
+    samples_dir = os.path.join(neutts_air_path, "samples")
+    speakers = []
     
-    if speaker_name in speaker_files:
-        speaker = speaker_files[speaker_name]
-        with open(speaker["text"], "r", encoding="utf-8") as f:
+    if os.path.exists(samples_dir):
+        for file in os.listdir(samples_dir):
+            if file.endswith('.wav'):
+                speaker_name = os.path.splitext(file)[0]
+                # Check if corresponding .txt file exists
+                txt_file = os.path.join(samples_dir, f"{speaker_name}.txt")
+                if os.path.exists(txt_file):
+                    # Capitalize first letter for display
+                    speakers.append(speaker_name.capitalize())
+    
+    return sorted(speakers)
+
+def load_reference_speaker(speaker_name):
+    """Load pre-defined speakers dynamically from samples folder."""
+    samples_dir = os.path.join(neutts_air_path, "samples")
+    
+    # Convert to lowercase for file lookup
+    speaker_lower = speaker_name.lower()
+    audio_path = os.path.join(samples_dir, f"{speaker_lower}.wav")
+    text_path = os.path.join(samples_dir, f"{speaker_lower}.txt")
+    
+    if os.path.exists(audio_path) and os.path.exists(text_path):
+        with open(text_path, "r", encoding="utf-8") as f:
             ref_text = f.read().strip()
-        return speaker["audio"], ref_text
+        return audio_path, ref_text
     return None, ""
 
 def chunk_text_for_neutts(text, max_chars=200):
@@ -211,8 +223,8 @@ with gr.Blocks(title="IQ Speechy - Multi-TTS") as demo:
         with gr.Row():
             with gr.Column():
                 neutts_preset = gr.Dropdown(
-                    choices=["Custom", "Dave", "Jo"],
-                    value="Dave",
+                    choices=["Custom"] + get_available_speakers(),
+                    value=get_available_speakers()[0] if get_available_speakers() else "Custom",
                     label="Select Preset Speaker"
                 )
                 
@@ -447,7 +459,8 @@ with gr.Blocks(title="IQ Speechy - Multi-TTS") as demo:
     # Tab 4: NeuTTS Podcast Generator
     with gr.Tab("🎙️ NeuTTS Podcast"):
         gr.Markdown("## Generate Podcasts with Voice Cloning")
-        gr.Markdown("Use Dave and Jo preset voices for natural conversations!")
+        available_voices = get_available_speakers()
+        gr.Markdown(f"Available voices: **{', '.join(available_voices)}**")
         
         with gr.Row():
             with gr.Column():
@@ -483,17 +496,25 @@ with gr.Blocks(title="IQ Speechy - Multi-TTS") as demo:
                 
                 tts = initialize_neutts()
                 
-                # Parse script for speaker tags [Dave] or [Jo]
-                pattern = r'\[(Dave|Jo)\]\s*(.+?)(?=\[(?:Dave|Jo)\]|$)'
-                matches = re.findall(pattern, script, re.DOTALL)
+                # Get available speakers dynamically
+                available_speakers = get_available_speakers()
+                if not available_speakers:
+                    raise ValueError("No speaker samples found in neutts-air/samples/")
+                
+                # Build dynamic regex pattern for all available speakers
+                speaker_pattern = '|'.join(available_speakers)
+                pattern = rf'\[({speaker_pattern})\]\s*(.+?)(?=\[(?:{speaker_pattern})\]|$)'
+                matches = re.findall(pattern, script, re.DOTALL | re.IGNORECASE)
                 
                 if not matches:
-                    raise ValueError("No valid speaker tags found. Use [Dave] or [Jo]")
+                    raise ValueError(f"No valid speaker tags found. Use: {', '.join([f'[{s}]' for s in available_speakers])}")
                 
-                # Pre-load reference codes for both speakers
+                # Pre-load reference codes for used speakers
                 speaker_codes = {}
                 speaker_texts = {}
-                for speaker in ["Dave", "Jo"]:
+                used_speakers = set(m[0].capitalize() for m in matches)
+                
+                for speaker in used_speakers:
                     audio_path, ref_text = load_reference_speaker(speaker)
                     if audio_path:
                         speaker_codes[speaker] = tts.encode_reference(audio_path)
@@ -508,6 +529,7 @@ with gr.Blocks(title="IQ Speechy - Multi-TTS") as demo:
                     if not text:
                         continue
                     
+                    speaker = speaker.capitalize()  # Normalize speaker name
                     if speaker not in speaker_codes:
                         raise ValueError(f"Unknown speaker: {speaker}")
                     
@@ -539,9 +561,13 @@ with gr.Blocks(title="IQ Speechy - Multi-TTS") as demo:
             outputs=neutts_podcast_output
         )
         
-        gr.Markdown("""
+        # Generate dynamic help text
+        voice_tags = ', '.join([f'`[{v}]`' for v in available_voices])
+        voice_table = '\n'.join([f'        | `[{v}]` | {v} voice |' for v in available_voices])
+        
+        gr.Markdown(f"""
         ### How to use:
-        1. Write your script using speaker tags: `[Dave]` or `[Jo]`
+        1. Write your script using speaker tags: {voice_tags}
         2. Each tag starts a new speaker's dialogue
         3. Adjust pause duration between speakers
         4. Click "Generate NeuTTS Podcast"
@@ -549,10 +575,10 @@ with gr.Blocks(title="IQ Speechy - Multi-TTS") as demo:
         ### Voice Guide:
         | Tag | Voice |
         |-----|-------|
-        | `[Dave]` | Male voice (preset) |
-        | `[Jo]` | Female voice (preset) |
+{voice_table}
         
         ⚠️ **Note**: NeuTTS is slower than Supertonic but provides voice cloning.
+        💡 **Tip**: Add new voices by placing `.wav` and `.txt` files in `neutts-air/samples/`
         """)
 
 if __name__ == "__main__":
