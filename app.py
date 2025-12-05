@@ -63,6 +63,38 @@ def load_reference_speaker(speaker_name):
         return audio_path, ref_text
     return None, ""
 
+import torch
+
+def encode_and_cache_speaker(tts, speaker_name):
+    """Encode speaker and cache the .pt file for faster loading next time."""
+    samples_dir = os.path.join(neutts_air_path, "samples")
+    speaker_lower = speaker_name.lower()
+    
+    audio_path = os.path.join(samples_dir, f"{speaker_lower}.wav")
+    cache_path = os.path.join(samples_dir, f"{speaker_lower}.pt")
+    text_path = os.path.join(samples_dir, f"{speaker_lower}.txt")
+    
+    # Load reference text
+    with open(text_path, "r", encoding="utf-8") as f:
+        ref_text = f.read().strip()
+    
+    # Check if cached .pt exists and is newer than .wav
+    if os.path.exists(cache_path):
+        wav_mtime = os.path.getmtime(audio_path)
+        pt_mtime = os.path.getmtime(cache_path)
+        if pt_mtime >= wav_mtime:
+            print(f"Loading cached embedding for {speaker_name} from {cache_path}")
+            ref_codes = torch.load(cache_path, weights_only=True)
+            return ref_codes, ref_text
+    
+    # Encode and cache
+    print(f"Encoding and caching speaker embedding for {speaker_name}...")
+    ref_codes = tts.encode_reference(audio_path)
+    torch.save(ref_codes, cache_path)
+    print(f"Saved embedding cache to {cache_path}")
+    
+    return ref_codes, ref_text
+
 def chunk_text_for_neutts(text, max_chars=200):
     """Split text into chunks by character limit, preserving complete sentences when possible."""
     import re
@@ -128,15 +160,15 @@ def generate_neutts_speech(text, reference_audio, reference_text, preset_speaker
         tts = initialize_neutts()
         
         if preset_speaker != "Custom":
-            reference_audio, reference_text = load_reference_speaker(preset_speaker)
-        
-        if not reference_audio or not reference_text:
-            raise ValueError("Reference audio and text are required")
+            # Use caching for preset speakers
+            ref_codes, reference_text = encode_and_cache_speaker(tts, preset_speaker)
+        else:
+            if not reference_audio or not reference_text:
+                raise ValueError("Reference audio and text are required")
+            ref_codes = tts.encode_reference(reference_audio)
         
         if not text.strip():
             raise ValueError("Text to synthesize is required")
-        
-        ref_codes = tts.encode_reference(reference_audio)
         
         # Auto-chunk long text (200 chars per chunk to stay within NeuTTS limits)
         chunks = chunk_text_for_neutts(text.strip(), max_chars=200)
@@ -510,15 +542,15 @@ with gr.Blocks(title="IQ Speechy - Multi-TTS") as demo:
                     raise ValueError(f"No valid speaker tags found. Use: {', '.join([f'[{s}]' for s in available_speakers])}")
                 
                 # Pre-load reference codes for used speakers
+                # Pre-load reference codes for used speakers (with caching)
                 speaker_codes = {}
                 speaker_texts = {}
                 used_speakers = set(m[0].capitalize() for m in matches)
                 
                 for speaker in used_speakers:
-                    audio_path, ref_text = load_reference_speaker(speaker)
-                    if audio_path:
-                        speaker_codes[speaker] = tts.encode_reference(audio_path)
-                        speaker_texts[speaker] = ref_text
+                    ref_codes, ref_text = encode_and_cache_speaker(tts, speaker)
+                    speaker_codes[speaker] = ref_codes
+                    speaker_texts[speaker] = ref_text
                 
                 # Generate audio for each segment
                 audio_segments = []
